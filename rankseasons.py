@@ -1,6 +1,8 @@
 import requests
 import datetime
 import time
+import pandas
+import matplotlib.pyplot as plt
 
 seasons = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
 
@@ -18,7 +20,6 @@ def seasonal_rankings_one_season(year, season, page):
             media (season: $season, seasonYear:$year){
                 type
                 averageScore
-                popularity
             }
         }
     }'''
@@ -30,38 +31,38 @@ def seasonal_rankings_one_season(year, season, page):
     }
 
     response = requests.post(url, json={'query': query, 'variables': variables}).json()
-    print(response)
     
     hasNextPage = response['data']['Page']['pageInfo']['hasNextPage']
 
-    sumOfPopularity = 0
-    weightedAverageNoDivide = 0
+    listOfScores = []
 
     for anime in response['data']['Page']['media']:
         if anime['type'] == 'ANIME' and anime['averageScore'] is not None:
-            sumOfPopularity += anime['popularity']
-            weightedAverageNoDivide += anime['popularity'] * anime['averageScore']
+            listOfScores.append(anime['averageScore'])
 
     if hasNextPage:
-        weightedAverageNoDivideNext, sumOfPopularityNext = seasonal_rankings_one_season(year, season, page+1)
-        weightedAverageNoDivide += weightedAverageNoDivideNext
-        sumOfPopularity += sumOfPopularityNext
+        newListOfScores = seasonal_rankings_one_season(year, season, page+1)
+        listOfScores += newListOfScores
         
-    return weightedAverageNoDivide, sumOfPopularity
+    return listOfScores
 
 
 def findBestSeason(startYear):
-    seasonDict = {"WINTER":{"weightAvg":0, "popSum":0}, "SPRING":{"weightAvg":0, "popSum":0}, "SUMMER":{"weightAvg":0, "popSum":0}, "FALL":{"weightAvg":0, "popSum":0}}
+    dictOfScores = {'WINTER':[], 'SPRING':[], 'SUMMER':[], 'FALL':[]}
     while startYear < datetime.datetime.now().year:
         for season in seasons:
-            weightAvg, popSum = seasonal_rankings_one_season(startYear, season, 1)
-            seasonDict[season]["weightAvg"] += weightAvg
-            seasonDict[season]["popSum"] += popSum
+            dictOfScores[season] += seasonal_rankings_one_season(startYear, season, 1)
             time.sleep(5)
         startYear += 1
-    return seasonDict     
+    return dictOfScores    
 
-seasonDict = findBestSeason(2010)
+dictOfScores = findBestSeason(2010)
+dfWinter = pandas.DataFrame(dictOfScores['WINTER'], columns=['WINTER'])
+dfSpring = pandas.DataFrame(dictOfScores['SPRING'], columns=['SPRING'])
+dfSummer = pandas.DataFrame(dictOfScores['SUMMER'], columns=['SUMMER'])
+dfFall = pandas.DataFrame(dictOfScores['FALL'], columns=['FALL'])
 
-for season in seasonDict:
-    print(season + ": " + str(seasonDict[season]['weightAvg']/seasonDict[season]['popSum']))
+print(dfWinter.describe())
+print(dfSpring.describe())
+print(dfSummer.describe())
+print(dfFall.describe())
